@@ -49,6 +49,8 @@ import com.android.phone.SubscriptionInfoHelper;
 import com.android.phone.vvm.omtp.OmtpVvmCarrierConfigHelper;
 import com.android.phone.vvm.omtp.sync.OmtpVvmSourceManager;
 
+import cyanogenmod.providers.CMSettings;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -104,6 +106,8 @@ public class VoicemailSettingsActivity extends PreferenceActivity
     private static final String BUTTON_VOICEMAIL_KEY = "button_voicemail_key";
     private static final String BUTTON_VOICEMAIL_PROVIDER_KEY = "button_voicemail_provider_key";
     private static final String BUTTON_VOICEMAIL_SETTING_KEY = "button_voicemail_setting_key";
+    private static final String BUTTON_VOICEMAIL_CATEGORY_KEY = "button_voicemail_category_key";
+    private static final String BUTTON_MWI_NOTIFICATION_KEY = "button_mwi_notification_key";
 
     /** Event for Async voicemail change call */
     private static final int EVENT_VOICEMAIL_CHANGED        = 500;
@@ -199,6 +203,7 @@ public class VoicemailSettingsActivity extends PreferenceActivity
     private EditPhoneNumberPreference mSubMenuVoicemailSettings;
     private VoicemailProviderListPreference mVoicemailProviders;
     private PreferenceScreen mVoicemailSettings;
+    private SwitchPreference mMwiNotification;
     private VoicemailRingtonePreference mVoicemailNotificationRingtone;
     private CheckBoxPreference mVoicemailNotificationVibrate;
     private SwitchPreference mVoicemailVisualVoicemail;
@@ -242,6 +247,23 @@ public class VoicemailSettingsActivity extends PreferenceActivity
         mSubMenuVoicemailSettings.setParentActivity(this, VOICEMAIL_PREF_ID, this);
         mSubMenuVoicemailSettings.setDialogOnClosedListener(this);
         mSubMenuVoicemailSettings.setDialogTitle(R.string.voicemail_settings_number_label);
+
+        mMwiNotification = (SwitchPreference) findPreference(BUTTON_MWI_NOTIFICATION_KEY);
+        if (mMwiNotification != null) {
+            if (getResources().getBoolean(R.bool.sprint_mwi_quirk)) {
+                mMwiNotification.setOnPreferenceChangeListener(this);
+                int mwiNotificationEnabled = CMSettings.System.getInt(getContentResolver(),
+                        CMSettings.System.ENABLE_MWI_NOTIFICATION, 0);
+                mMwiNotification.setChecked(mwiNotificationEnabled != 0);
+            } else {
+                PreferenceScreen voicemailCategory =
+                        (PreferenceScreen) findPreference(BUTTON_VOICEMAIL_CATEGORY_KEY);
+                if (voicemailCategory != null) {
+                    voicemailCategory.removePreference(mMwiNotification);
+                }
+                mMwiNotification = null;
+            }
+        }
 
         mVoicemailProviders = (VoicemailProviderListPreference) findPreference(
                 BUTTON_VOICEMAIL_PROVIDER_KEY);
@@ -340,6 +362,11 @@ public class VoicemailSettingsActivity extends PreferenceActivity
                 mVMProviderSettingsForced = false;
                 return false;
             }
+        } else if (preference == mMwiNotification) {
+            CMSettings.System.putInt(mPhone.getContext().getContentResolver(),
+                    CMSettings.System.ENABLE_MWI_NOTIFICATION,
+                    mMwiNotification.isChecked() ? 1 : 0);
+            return true;
         }
         return false;
     }
@@ -399,7 +426,6 @@ public class VoicemailSettingsActivity extends PreferenceActivity
                 mOmtpVvmCarrierConfigHelper.startDeactivation();
             }
         }
-
         // Always let the preference setting proceed.
         return true;
     }

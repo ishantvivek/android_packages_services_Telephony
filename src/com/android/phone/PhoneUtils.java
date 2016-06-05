@@ -31,6 +31,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.media.AudioManager;
 import android.net.Uri;
+import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Message;
 import android.os.PersistableBundle;
@@ -128,12 +129,11 @@ public class PhoneUtils {
     /** Noise suppression status as selected by user */
     private static boolean sIsNoiseSuppressionEnabled = true;
 
-    /**
-     * Theme to use for dialogs displayed by utility methods in this class. This is needed
-     * because these dialogs are displayed using the application context, which does not resolve
-     * the dialog theme correctly.
-     */
-    private static final int THEME = AlertDialog.THEME_DEVICE_DEFAULT_LIGHT;
+    /** Define serviceClass type for CallForward */
+    public static final int SERVICE_CLASS_VOICE = 1;
+    public static final int SERVICE_CLASS_VIDEO = 2;
+    /** Extra key to identify the service class voice or video */
+    public static final String SERVICE_CLASS = "service_class";
 
     private static class FgRingCalls {
         private Call fgCall;
@@ -148,6 +148,15 @@ public class PhoneUtils {
     private static AlertDialog sUssdDialog = null;
     private static StringBuilder sUssdMsg = new StringBuilder();
 
+    private static void onPhoneStateChanged(AsyncResult r) {
+        PhoneConstants.State state = PhoneGlobals.getInstance().mCM.getState();
+        if (state == PhoneConstants.State.OFFHOOK ||
+               state == PhoneConstants.State.IDLE) {
+            toggleAecState();
+        }
+    }
+
+
     /**
      * Handler that tracks the connections and updates the value of the
      * Mute settings for each connection as needed.
@@ -156,6 +165,9 @@ public class PhoneUtils {
         @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {
+                case PHONE_STATE_CHANGED:
+                    onPhoneStateChanged((AsyncResult) msg.obj);
+                    break;
                 case MSG_CHECK_STATUS_ANSWERCALL:
                     FgRingCalls frC = (FgRingCalls) msg.obj;
                     // wait for finishing disconnecting
@@ -255,26 +267,6 @@ public class PhoneUtils {
                 answered = true;
 
                 setAudioMode();
-
-                // Check is phone in any dock, and turn on speaker accordingly
-                final boolean speakerActivated = activateSpeakerIfDocked(phone);
-
-                final BluetoothManager btManager = app.getBluetoothManager();
-
-                // When answering a phone call, the user will move the phone near to her/his ear
-                // and start conversation, without checking its speaker status. If some other
-                // application turned on the speaker mode before the call and didn't turn it off,
-                // Phone app would need to be responsible for the speaker phone.
-                // Here, we turn off the speaker if
-                // - the phone call is the first in-coming call,
-                // - we did not activate speaker by ourselves during the process above, and
-                // - Bluetooth headset is not in use.
-                if (isRealIncomingCall && !speakerActivated && isSpeakerOn(app)
-                        && !btManager.isBluetoothHeadsetAudioOn()) {
-                    // This is not an error but might cause users' confusion. Add log just in case.
-                    Log.i(LOG_TAG, "Forcing speaker off due to new incoming call...");
-                    turnOnSpeaker(app, false, true);
-                }
             } catch (CallStateException ex) {
                 Log.w(LOG_TAG, "answerCall: caught " + ex, ex);
 
@@ -672,20 +664,6 @@ public class PhoneUtils {
             startGetCallerInfo(context, connection, null, null, gatewayInfo);
 
             setAudioMode();
-
-            if (DBG) log("about to activate speaker");
-            // Check is phone in any dock, and turn on speaker accordingly
-            final boolean speakerActivated = activateSpeakerIfDocked(phone);
-
-            final BluetoothManager btManager = app.getBluetoothManager();
-
-            // See also similar logic in answerCall().
-            if (initiallyIdle && !speakerActivated && isSpeakerOn(app)
-                    && !btManager.isBluetoothHeadsetAudioOn()) {
-                // This is not an error but might cause users' confusion. Add log just in case.
-                Log.i(LOG_TAG, "Forcing speaker off when initiating a new outgoing call...");
-                PhoneUtils.turnOnSpeaker(app, false, true);
-            }
         }
 
         return status;
@@ -866,7 +844,7 @@ public class PhoneUtils {
             if (DBG) log("running USSD code, displaying indeterminate progress.");
 
             // create the indeterminate progress dialog and display it.
-            ProgressDialog pd = new ProgressDialog(context);
+            ProgressDialog pd = new ProgressDialog(context, R.style.DialerAlertDialogTheme);
             pd.setMessage(context.getText(R.string.ussdRunning));
             pd.setCancelable(false);
             pd.setIndeterminate(true);
@@ -937,7 +915,7 @@ public class PhoneUtils {
 
             // create the progress dialog, make sure the flags and type are
             // set correctly.
-            ProgressDialog pd = new ProgressDialog(app);
+            ProgressDialog pd = new ProgressDialog(app, R.style.DialerAlertDialogTheme);
             pd.setTitle(title);
             pd.setMessage(text);
             pd.setCancelable(false);
@@ -973,7 +951,9 @@ public class PhoneUtils {
                 // places the message at the forefront of the UI.
 
                 if (sUssdDialog == null) {
-                    sUssdDialog = new AlertDialog.Builder(context, THEME)
+                    ContextThemeWrapper contextThemeWrapper =
+                            new ContextThemeWrapper(context, R.style.DialerAlertDialogTheme);
+                    sUssdDialog = new AlertDialog.Builder(contextThemeWrapper)
                             .setPositiveButton(R.string.ok, null)
                             .setCancelable(true)
                             .setOnDismissListener(new DialogInterface.OnDismissListener() {
@@ -2199,35 +2179,6 @@ public class PhoneUtils {
         return PhoneNumberUtils.isGlobalPhoneNumber(number);
     }
 
-   /**
-    * This function is called when phone answers or places a call.
-    * Check if the phone is in a car dock or desk dock.
-    * If yes, turn on the speaker, when no wired or BT headsets are connected.
-    * Otherwise do nothing.
-    * @return true if activated
-    */
-    private static boolean activateSpeakerIfDocked(Phone phone) {
-        if (DBG) log("activateSpeakerIfDocked()...");
-
-        boolean activated = false;
-        if (PhoneGlobals.mDockState != Intent.EXTRA_DOCK_STATE_UNDOCKED) {
-            if (DBG) log("activateSpeakerIfDocked(): In a dock -> may need to turn on speaker.");
-            final PhoneGlobals app = PhoneGlobals.getInstance();
-
-            // TODO: This function should move to AudioRouter
-            final BluetoothManager btManager = app.getBluetoothManager();
-            //final WiredHeadsetManager wiredHeadset = app.getWiredHeadsetManager();
-            //final AudioRouter audioRouter = app.getAudioRouter();
-
-            /*if (!wiredHeadset.isHeadsetPlugged() && !btManager.isBluetoothHeadsetAudioOn()) {
-                //audioRouter.setSpeaker(true);
-                activated = true;
-            }*/
-        }
-        return activated;
-    }
-
-
     /**
      * Returns whether the phone is in ECM ("Emergency Callback Mode") or not.
      */
@@ -2568,4 +2519,21 @@ public class PhoneUtils {
         }
         return null;
     }
+
+    public static void toggleAecState() {
+        final PhoneGlobals app = PhoneGlobals.getInstance();
+        String aecParam = app.getResources().getString(
+                R.string.incall_echo_cancellation_parameter);
+        String[] aecParamValues = app.getResources().getStringArray(
+                R.array.incall_echo_cancellation_values);
+
+        if (!TextUtils.isEmpty(aecParam) && aecParamValues.length == 2) {
+            AudioManager audioManager = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+            boolean aecState = !PhoneSettings.isAecDisabled(app);
+
+            String aecToggle = aecParam + "=" + ( aecState ? aecParamValues[0] : aecParamValues[1] );
+            audioManager.setParameters(aecToggle);
+        }
+    }
+
 }

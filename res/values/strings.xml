@@ -20,7 +20,7 @@
          and other settings UIs.  This is the version of the label for
          tablet devices, where the phone app handles mobile data but not
          actual phone calls. -->
-    <string name="phoneAppLabel" product="tablet">Mobile Data</string>
+    <string name="phoneAppLabel" product="tablet">Cellular Data</string>
 
     <!-- Official label of the phone app, as seen in "Manage Applications"
          and other settings UIs. -->
@@ -115,7 +115,7 @@
     <!-- settings strings -->
 
     <!-- Error message for users that aren't allowed to modify Mobile Network settings [CHAR LIMIT=none] -->
-    <string name="mobile_network_settings_not_available">Mobile network settings are not available for this user</string>
+    <string name="mobile_network_settings_not_available">Cellular network settings are not available for this user</string>
     <!-- GSM Call settings screen, setting option name. [CHAR LIMIT=40] -->
     <string name="labelGSMMore">GSM call settings</string>
     <!-- GSM Call settings screen, setting option name with label indicating the SIM the settings
@@ -330,7 +330,7 @@
 
     <!-- networks setting strings --><skip/>
     <!-- Mobile network settings screen title -->
-    <string name="mobile_networks">Mobile network settings</string>
+    <string name="mobile_networks">Cellular network settings</string>
     <!-- Available networks screen title/heading -->
     <string name="label_available">Available networks</string>
     <!-- Mobile network settings screen, toast when searching for available networks -->
@@ -616,7 +616,6 @@
     <string name="network_2G" translatable="false">2G</string>
     <string name="network_1x" translatable="false">1x</string>
     <string name="network_global">Global</string>
-    <string name="network_tdscdma">TDSCDMA Only</string>
 
     <string-array name="enabled_networks_except_gsm_choices" translatable="false">
         <item>@string/network_lte</item>
@@ -698,13 +697,11 @@
         <item>@string/network_lte</item>
         <item>@string/network_3G</item>
         <item>@string/network_2G</item>
-        <item>@string/network_tdscdma</item>
     </string-array>
     <string-array name="enabled_networks_tdscdma_values" translatable="false">
         <item>"22"</item>
         <item>"18"</item>
         <item>"1"</item>
-        <item>"13"</item>
     </string-array>
 
     <!-- CDMA System select strings -->
@@ -983,9 +980,9 @@
          This string is currently unused (see comments in InCallScreen.java.) -->
     <string name="incall_error_emergency_only">Not registered on network.</string>
     <!-- In-call screen: call failure message displayed in an error dialog -->
-    <string name="incall_error_out_of_service">Mobile network not available.</string>
+    <string name="incall_error_out_of_service">Cellular network not available.</string>
     <!-- In-call screen: call failure message displayed in an error dialog -->
-    <string name="incall_error_out_of_service_wfc">Mobile network is not available. Connect to a wireless network to make a call.</string>
+    <string name="incall_error_out_of_service_wfc">Cellular network is not available. Connect to a wireless network to make a call.</string>
     <!-- In-call screen: call failure message displayed in an error dialog -->
     <string name="incall_error_no_phone_number_supplied">To place a call, enter a valid number.</string>
     <!-- In-call screen: call failure message displayed in an error dialog -->

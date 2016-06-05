@@ -480,6 +480,16 @@ abstract class TelephonyConnection extends Connection {
         }
     }
 
+    @Override
+    public void onTransfer() {
+        Log.v(this, "onTransfer");
+        try {
+            getPhone().explicitCallTransfer();
+        } catch (CallStateException e) {
+            Log.e(this, e, "Fail to transfer call.");
+        }
+    }
+
     public void performHold() {
         Log.v(this, "performHold");
         // TODO: Can dialing calls be put on hold as well since they take up the
@@ -597,6 +607,11 @@ abstract class TelephonyConnection extends Connection {
         if (phone != null && phone.isInEcm()) {
             callCapabilities |= CAPABILITY_SHOW_CALLBACK_NUMBER;
         }
+
+        if (phone != null && phone.canTransfer()) {
+            callCapabilities |= CAPABILITY_SUPPORTS_TRANSFER;
+        }
+
         return callCapabilities;
     }
 
@@ -636,7 +651,7 @@ abstract class TelephonyConnection extends Connection {
         if (mOriginalConnection != null) {
             if (((getAddress() != null) &&
                     (getPhone().getPhoneType() == TelephonyManager.PHONE_TYPE_CDMA)) &&
-                    !isValidRingingCall()) {
+                    !mOriginalConnection.isIncoming()) {
                 address = getAddressFromNumber(mOriginalConnection.getOrigDialString());
             } else {
                 address = getAddressFromNumber(mOriginalConnection.getAddress());
@@ -694,6 +709,11 @@ abstract class TelephonyConnection extends Connection {
         setVideoProvider(mOriginalConnection.getVideoProvider());
         setAudioQuality(mOriginalConnection.getAudioQuality());
         updateExtras(mOriginalConnection.getConnectionExtras());
+
+        // Post update of extras to the handler; extras are updated via the handler to ensure thread
+        // safety.
+        mHandler.obtainMessage(MSG_CONNECTION_EXTRAS_CHANGED,
+                mOriginalConnection.getConnectionExtras()).sendToTarget();
 
         if (isImsConnection()) {
             mWasImsConnection = true;

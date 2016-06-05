@@ -117,8 +117,9 @@ public class NetworkSetting extends PreferenceActivity
 
                     ar = (AsyncResult) msg.obj;
                     if (ar.exception != null) {
-                        if (DBG) log("manual network selection: failed!");
+                        if (DBG) log("manual network selection: failed! switch back to auto ");
                         displayNetworkSelectionFailed(ar.exception);
+                        selectNetworkAutomatic();
                     } else {
                         if (DBG) log("manual network selection: succeeded!");
                         displayNetworkSelectionSucceeded();
@@ -302,8 +303,9 @@ public class NetworkSetting extends PreferenceActivity
         // we want this service to just stay in the background until it is killed, we
         // don't bother stopping it from our end.
         startService (new Intent(this, NetworkQueryService.class));
-        bindService (new Intent(this, NetworkQueryService.class), mNetworkQueryServiceConnection,
-                Context.BIND_AUTO_CREATE);
+        bindService (new Intent(this, NetworkQueryService.class).setAction(
+                NetworkQueryService.ACTION_LOCAL_BINDER),
+                mNetworkQueryServiceConnection, Context.BIND_AUTO_CREATE);
     }
 
     @Override
